@@ -8,7 +8,7 @@ declare const TradingView: any;
   @if(login) {
     <section [id]="containerId"> </section>
   } @else {
-    <h2>you are not logged in. you do not have access rights.</h2>
+    <h2 style="background: white; padding: 2rem">you are not logged in. you do not have access rights.</h2>
   }
   `,
   styleUrl: './app.component.scss'
@@ -68,6 +68,7 @@ export class AppComponent implements OnInit {
     if (event.data?.type === 'from_xroad') {
       const {psw, login} = event.data?.cred;
       if(psw === 'test' && login === 'test') {
+        this.login = true;
         alert('URA ТЫ ВОШЕЛ!!!')
       } else {
         alert('неправильные креды!')
