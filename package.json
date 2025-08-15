@@ -7,8 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "predeploy": "ng build --configuration production --base-href /trviewtest/",
+    "deploy": "gh-pages -d dist/trading-view-app"
   },
   "private": true,
   "dependencies": {
