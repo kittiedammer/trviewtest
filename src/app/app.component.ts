@@ -5,11 +5,17 @@ declare const TradingView: any;
 @Component({
   selector: 'app-root',
   template: `
-  <section [id]="containerId"> </section>
+  @if(login) {
+    <section [id]="containerId"> </section>
+  } @else {
+    <h2>you are not logged in. you do not have access rights.</h2>
+  }
   `,
   styleUrl: './app.component.scss'
 })
 export class AppComponent implements OnInit {
+
+  login = false;
 
   private _widgetConfig!: ITradingViewWidget;
   private _defaultConfig: ITradingViewWidget = {
@@ -51,7 +57,23 @@ export class AppComponent implements OnInit {
   constructor() { }
 
   ngOnInit(): void {
+    window.addEventListener('message', this.handleMessage.bind(this));
     this.appendScript(this.initWidget.bind(this));
+  }
+
+    private handleMessage(event: MessageEvent) {
+    // Всегда проверяйте origin в продакшене!
+    // if (event.origin !== 'https://parent-domain.com') return;
+    
+    if (event.data?.type === 'from_xroad') {
+      const {psw, login} = event.data?.cred;
+      if(psw === 'test' && login === 'test') {
+        alert('URA ТЫ ВОШЕЛ!!!')
+      } else {
+        alert('неправильные креды!')
+      }
+      
+    }
   }
 
   initWidget () {
