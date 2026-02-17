@@ -1,175 +1,91 @@
-import { Component, OnInit, Input } from '@angular/core';
-import { BarStyles, CONTAINER_ID, IntervalTypes, ITradingViewWidget, SCRIPT_ID, Themes } from './tradingview-widget.model';
+import { Component, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterOutlet } from '@angular/router';
 
-declare const TradingView: any;
 @Component({
   selector: 'app-root',
   template: `
-  @if(login) {
-    <section [id]="containerId"> </section>
-  } @else {
-    <h2 style="background: white; padding: 2rem">you are not logged in. you do not have access rights.</h2>
-  }
+    <div>
+      <div style="background: white">
+        <h2>test notify</h2>
+        <label
+          ><input
+            type="radio"
+            name="msgType"
+            [(ngModel)]="type"
+            [value]="'error-notify'"
+          />
+          error</label
+        >
+        <label
+          ><input
+            type="radio"
+            name="msgType"
+            [(ngModel)]="type"
+            [value]="'success-notify'"
+          />
+          success</label
+        >
+      </div>
+      <input type="text" [(ngModel)]="text" />
+      <button (click)="testMessage()">test message</button
+      ><button (click)="closeConnection()">close from iframe</button>
+    </div>
+    <router-outlet></router-outlet>
   `,
-  styleUrl: './app.component.scss'
+  styleUrl: './app.component.scss',
+  imports: [RouterOutlet, FormsModule],
 })
 export class AppComponent implements OnInit {
+  iframeUrl: string = '';
+  text = '';
+  type: 'error-notify' | 'success-notify' = 'error-notify';
 
-  login = false;
-
-  private _widgetConfig!: ITradingViewWidget;
-  private _defaultConfig: ITradingViewWidget = {
-    symbol: 'NASDAQ:AAPL',
-    allow_symbol_change: true,
-    autosize: false,
-    enable_publishing: false,
-    height: 610,
-    hideideas: true,
-    hide_legend: false,
-    hide_side_toolbar: true,
-    hide_top_toolbar: false,
-    interval: IntervalTypes.D,
-    locale: 'en',
-    save_image: true,
-    show_popup_button: false,
-    style: BarStyles.CANDLES,
-    theme: Themes.LIGHT,
-    timezone: 'Etc/UTC',
-    toolbar_bg: '#F1F3F6',
-    widgetType: 'widget',
-    width: 980,
-    withdateranges: false
-  };
-
-  style: {} = {};
-  containerId = CONTAINER_ID;
-
-  @Input('widgetConfig') set widgetConfig (value: ITradingViewWidget) {
-      this._widgetConfig = value;
-      this.cleanWidget();
-      this.initWidget();
-   }
-
-   get widgetConfig (): ITradingViewWidget {
-    return this._widgetConfig || this._defaultConfig;
-  }
-
-  constructor() { }
+  constructor(private router: Router) {}
 
   ngOnInit(): void {
     window.addEventListener('message', this.handleMessage.bind(this));
-    this.appendScript(this.initWidget.bind(this));
   }
 
-    private handleMessage(event: MessageEvent) {
-    // Всегда проверяйте origin в продакшене!
-    // if (event.origin !== 'https://parent-domain.com') return;
-    
-    if (event.data?.type === 'from_xroad') {
-      const {psw, login} = event.data?.cred;
-      if(psw === 'test' && login === 'test') {
-        this.login = true;
-        alert('URA ТЫ ВОШЕЛ!!!')
+  private handleMessage(event: MessageEvent) {
+    if (event.data?.type === 'xroad_iframe') {
+      this.iframeUrl = event.origin;
+      const trview_login = localStorage.getItem('trview_login');
+      if (trview_login === 'test') {
+        this.router.navigate(['/trading']);
       } else {
-        alert('неправильные креды!')
+        const { password, username } = event.data?.credential;
+        if (password === 'aUuKuKu!' && username === 'test') {
+          this.sendMessageToParent({
+            type: 'success-notify',
+            data: "you're auth to trading view",
+          });
+          this.router.navigate(['/trading']);
+          localStorage.setItem('trview_login', 'test');
+        } else {
+          this.sendMessageToParent({ type: 'close-connection' });
+          this.router.navigate(['/not-permited']);
+        }
       }
-      
     }
   }
 
-  initWidget () {
-    /* global TradingView */
-    if (typeof TradingView === 'undefined' || !this.getContainer()) return;
-    
-    const { widgetType, ...widgetConfig } = this.widgetConfig;
-    const config = { ...widgetConfig, container_id: this.containerId };
-
-    if (config.autosize) {
-      delete config.width;
-      delete config.height;
-    }
-
-
-    if (config.popup_width && typeof config.popup_width === 'number') {
-      config.popup_width = config.popup_width.toString();
-    }
-
-    if (config.popup_height && typeof config.popup_height === 'number') {
-      config.popup_height = config.popup_height.toString();
-    }
-
-    if(config.autosize) {
-      this.style = {
-        width: '100%',
-        height: '100%'
-      };
-    }
-    /* global TradingView */
-    if(!!widgetType)
-      new TradingView[widgetType](config);
-    else 
-      console.error(`Can not create "TradingView", because "widgetType" is missing`)
-  };
-
-  appendScript (onload : (() => any)) {
-    if (!this.canUseDOM()) {
-      onload();
-      return;
-    }
-
-    if (this.scriptExists()) {
-      /* global TradingView */
-      if (typeof TradingView === 'undefined') {
-        this.updateOnloadListener(onload);
-        return;
-      }
-      onload();
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = SCRIPT_ID;
-    script.type = 'text/javascript';
-    script.async = true;
-    script.src = 'https://s3.tradingview.com/tv.js';
-    script.onload = onload;
-    document.getElementsByTagName('head')[0].appendChild(script);
-  };
-  
-  canUseDOM () {
-    return typeof window !== 'undefined' &&
-    window.document &&
-    window.document.createElement
+  testMessage() {
+    if(this.text?.length) this.sendMessageToParent({ type: this.type, data: this.text });
   }
 
-  scriptExists () {
-    return this.getScriptElement() !== null;
+  closeConnection() {
+    localStorage.removeItem('trview_login');
+    this.sendMessageToParent({ type: 'close-connection' });
   }
 
-  updateOnloadListener (onload: (() => any)) {
-    const script = this.getScriptElement() || {} as any;
-    const oldOnload = script.onload.bind(this);
-    return script.onload = () => {
-      oldOnload();
-      onload();
-    };
-  };
-
-  getScriptElement () {
-    return document.getElementById(SCRIPT_ID);
-  }
-
-  cleanWidget () {
-    if (!this.canUseDOM()) return;
-    const container = this.getContainer();
-    if(container) {
-      container.innerHTML = '';
+  // Основной метод отправки сообщений
+  sendMessageToParent(message: { type: string; data?: string }): void {
+    if (window.parent) {
+      window.parent.postMessage(message, this.iframeUrl); // В продакшене укажите конкретный origin
+    } else {
+      console.warn('No parent window found for messaging');
     }
-  };
-
-  getContainer () {
-    return document.getElementById(this.containerId);
   }
-
-    
-
 }
+
